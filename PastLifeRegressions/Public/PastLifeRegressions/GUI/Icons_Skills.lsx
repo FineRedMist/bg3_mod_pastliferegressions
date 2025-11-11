@@ -1,0 +1,35 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<save>
+  <version major="4" minor="0" revision="0" build="49" />
+  <region id="IconUVList">
+    <node id="root">
+      <children>
+        <node id="IconUV">
+          <attribute id="MapKey" type="FixedString" value="icon_PastLifeRegressions" />
+          <attribute id="U1" type="float" value="0" />
+          <attribute id="U2" type="float" value="1" />
+          <attribute id="V1" type="float" value="0" />
+          <attribute id="V2" type="float" value="1" />
+        </node>
+      </children>
+    </node>
+  </region>
+  <region id="TextureAtlasInfo">
+    <node id="root">
+      <children>
+        <node id="TextureAtlasIconSize">
+          <attribute id="Height" type="int32" value="64" />
+          <attribute id="Width" type="int32" value="64" />
+        </node>
+        <node id="TextureAtlasPath">
+          <attribute id="Path" type="string" value="Assets/Textures/Icons/PastLifeRegressions_Icons.DDS" />
+          <attribute id="UUID" type="FixedString" value="0a941a9e-e548-44ed-b6c3-c9db2241e5cb" />
+        </node>
+        <node id="TextureAtlasTextureSize">
+          <attribute id="Height" type="int32" value="64" />
+          <attribute id="Width" type="int32" value="64" />
+        </node>
+      </children>
+    </node>
+  </region>
+</save>

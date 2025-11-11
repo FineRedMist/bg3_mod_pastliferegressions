@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<save>
+    <version major="4" minor="0" revision="9" build="307"/>
+    <region id="Backgrounds">
+        <node id="root">
+            <children>
+                <node id="Background">
+                    <attribute id="Description" type="TranslatedString" handle="h93c4ddbcgc015g47e8g8dc3gcf3b7e203ebb" version="1"/>
+                    <attribute id="DisplayName" type="TranslatedString" handle="h78ad2981gafebg446fgb94ega0d18483a94a" version="1"/>
+                    <attribute id="Passives" type="LSString" value="PastLifeRegressions_Passive"/>
+                    <attribute id="UUID" type="guid" value="1cee530b-124c-478e-ad6b-f3a32a2f8068"/>
+                    <children>
+                        <node id="Tags">
+                            <attribute id="Object" type="guid" value="238c5177-836f-4167-8ea8-9df39ee5f4ba"/>
+                        </node>
+                    </children>
+                </node>
+            </children>
+        </node>
+    </region>
+</save>

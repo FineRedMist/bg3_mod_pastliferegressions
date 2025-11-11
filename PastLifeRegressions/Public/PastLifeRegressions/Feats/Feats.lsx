@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<save>
+  <version major="4" minor="0" revision="9" build="322"/>
+  <region id="Feats">
+    <node id="root">
+      <children>
+        <node id="Feat">
+          <attribute id="Name" type="FixedString" value="PastLifeRegressions"/>
+          <attribute id="PassivesAdded" type="LSString" value="PastLifeRegressions_Passive"/>
+          <attribute id="UUID" type="guid" value="fe70bd84-7406-42c7-8c50-115022a37e82"/>
+        </node>
+      </children>
+    </node>
+  </region>
+</save>
