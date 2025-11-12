@@ -3,5 +3,6 @@ type "PassiveData"
 data "DisplayName" "h78ad2981gafebg446fgb94ega0d18483a94a;1"
 data "Description" "hf9eac616ga581g478bg92d3g4658774d2c73;1"
 data "Boosts" "Tag(BARBARIAN);Tag(BARD);Tag(CLERIC);Tag(DRUID);Tag(FIGHTER);Tag(MONK);Tag(PALADIN);Tag(RANGER);Tag(ROGUE);Tag(SORCERER);Tag(WARLOCK);Tag(WIZARD);Tag(ACOLYTE);Tag(CHARLATAN);Tag(CRIMINAL);Tag(ENTERTAINER);Tag(FOLK_HERO);Tag(GUILD_ARTISAN);Tag(HERMIT);Tag(NOBLE);Tag(OUTLANDER);Tag(SAGE);Tag(SAILOR);Tag(SOLDIER);Tag(URCHIN);Tag(PAST_LIFE_REGRESSIONS)"
+data "Properties" "Highlighted"
 data "Icon" "icon_PastLifeRegressions"
 
