@@ -6,7 +6,7 @@
 			<attribute id="Description" type="LSString" value="Revisit your pass lives and acquire insights from previous backgrounds and classes." />
 			<attribute id="DisplayDescription" type="TranslatedString" handle="hf9eac616ga581g478bg92d3g4658774d2c73" version="1" />
 			<attribute id="DisplayName" type="TranslatedString" handle="h78ad2981gafebg446fgb94ega0d18483a94a" version="1" />
-			<attribute id="Icon" type="FixedString" value="icon_PastLifeRegressions" />
+			<attribute id="Icon" type="FixedString" value="icon_PastLifeRegressions_Background" />
 			<attribute id="Name" type="FixedString" value="PAST_LIFE_REGRESSIONS" />
 			<attribute id="UUID" type="guid" value="238c5177-836f-4167-8ea8-9df39ee5f4ba" />
 			<children>

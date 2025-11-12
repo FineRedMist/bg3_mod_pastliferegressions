@@ -22,10 +22,11 @@ local queuedBackgroundGoals = {}
 ---Takes the first pending goal in the queued goals to apply if it isn't already in progress.
 local function ApplyQueuedBackgroundGoals()
     for _, goal in ipairs(queuedBackgroundGoals) do
+        _P("Pending background goal count: " .. tostring(#queuedBackgroundGoals))
         if goal.Status ~= QueuedBackgroundGoalStatus.Added then
             return
         end
-        -- _E6P("Applying queued background goal for character " .. tostring(goal.Character) .. " goal " .. tostring(goal.Goal))
+        _P("Applying queued background goal for character " .. tostring(goal.Character) .. " goal " .. tostring(goal.Goal))
         goal.Status = QueuedBackgroundGoalStatus.Committing
 
         local player = Ext.Entity.Get(goal.Character)
@@ -42,7 +43,7 @@ local function FinishBackgroundGoalApplication(status)
     local removeIndex = -1
     for index, goal in ipairs(queuedBackgroundGoals) do
         if goal.Status == QueuedBackgroundGoalStatus.Committing then
-            --_E6P(status .. " queued background goal for character " .. tostring(goal.Character) .. " goal " .. tostring(goal.Goal))
+            _P(status .. " queued background goal for character " .. tostring(goal.Character) .. " goal " .. tostring(goal.Goal))
 
             removeIndex = index
 
@@ -81,7 +82,7 @@ end
 ---@param character CHARACTER The character the goal was being applied to.
 ---@param goal GUIDSTRING The id of the goal being rewarded.
 local function BackgroundGoalFailed(character, goal)
-    --_E6P("BackgroundGoalFailed called for character " .. tostring(character) .. " goal " .. tostring(goal))
+    _P("BackgroundGoalFailed called for character " .. tostring(character) .. " goal " .. tostring(goal))
 
     -- Check queued background goals to make sure we don't double queue
     if FinishBackgroundGoalApplication("Failed") then
@@ -96,6 +97,7 @@ local function BackgroundGoalFailed(character, goal)
     end
 
     if not HasPastLifeRegressionTag(player) then
+        _P(player .. " does not have Past Life Regressions tag, ignoring.")
         return
     end
 
@@ -129,7 +131,7 @@ end
 ---@param character CHARACTER The character the goal was being applied to.
 ---@param goal GUIDSTRING The id of the goal being rewarded.
 local function BackgroundGoalRewarded(character, goal)
-    --_E6P("BackgroundGoalRewarded called for character " .. tostring(character) .. " goal " .. tostring(goal))
+    _P("BackgroundGoalRewarded called for character " .. tostring(character) .. " goal " .. tostring(goal))
     FinishBackgroundGoalApplication("Completed")
 end
 
@@ -139,10 +141,12 @@ local function BackgroundGoalsTick(tickParams)
 end
 
 function Init_PastLifeRegressions()
-    
+    _P("Initializing Past Life Regressions Script Extender")
+
+    -- Processes any pending background goals to apply.
     Ext.Events.Tick:Subscribe(BackgroundGoalsTick)
-    
+
     -- Handles identifying when background goals fail and succeed to refine the queue.
-    Ext.Osiris.RegisterListener("BackgroundGoalFailed", 2, "after", BackgroundGoalFailed)
+    Ext.Osiris.RegisterListener("BackgroundGoalFailed", 2, "before", BackgroundGoalFailed)
     Ext.Osiris.RegisterListener("BackgroundGoalRewarded", 2, "after", BackgroundGoalRewarded)
 end
