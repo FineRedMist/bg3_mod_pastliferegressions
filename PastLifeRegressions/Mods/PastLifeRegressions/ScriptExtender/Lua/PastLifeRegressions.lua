@@ -1,5 +1,7 @@
 local pastLifeRegressionsTagId = "238c5177-836f-4167-8ea8-9df39ee5f4ba"
 
+local bDebug = false
+
 --- @enum QueuedBackgroundGoalStatus
 local QueuedBackgroundGoalStatus = {
 	Added = 0,
@@ -22,11 +24,11 @@ local queuedBackgroundGoals = {}
 ---Takes the first pending goal in the queued goals to apply if it isn't already in progress.
 local function ApplyQueuedBackgroundGoals()
     for _, goal in ipairs(queuedBackgroundGoals) do
-        _P("Pending background goal count: " .. tostring(#queuedBackgroundGoals))
+        if bDebug then Ext.Log.Print("Pending background goal count: " .. tostring(#queuedBackgroundGoals)) end
         if goal.Status ~= QueuedBackgroundGoalStatus.Added then
             return
         end
-        _P("Applying queued background goal for character " .. tostring(goal.Character) .. " goal " .. tostring(goal.Goal))
+        if bDebug then Ext.Log.Print("Applying queued background goal for character " .. tostring(goal.Character) .. " goal " .. tostring(goal.Goal)) end
         goal.Status = QueuedBackgroundGoalStatus.Committing
 
         local player = Ext.Entity.Get(goal.Character)
@@ -43,7 +45,7 @@ local function FinishBackgroundGoalApplication(status)
     local removeIndex = -1
     for index, goal in ipairs(queuedBackgroundGoals) do
         if goal.Status == QueuedBackgroundGoalStatus.Committing then
-            _P(status .. " queued background goal for character " .. tostring(goal.Character) .. " goal " .. tostring(goal.Goal))
+            if bDebug then Ext.Log.Print(status .. " queued background goal for character " .. tostring(goal.Character) .. " goal " .. tostring(goal.Goal)) end
 
             removeIndex = index
 
@@ -82,7 +84,7 @@ end
 ---@param character CHARACTER The character the goal was being applied to.
 ---@param goal GUIDSTRING The id of the goal being rewarded.
 local function BackgroundGoalFailed(character, goal)
-    _P("BackgroundGoalFailed called for character " .. tostring(character) .. " goal " .. tostring(goal))
+    if bDebug then Ext.Log.Print("BackgroundGoalFailed called for character " .. tostring(character) .. " goal " .. tostring(goal)) end
 
     -- Check queued background goals to make sure we don't double queue
     if FinishBackgroundGoalApplication("Failed") then
@@ -92,17 +94,17 @@ local function BackgroundGoalFailed(character, goal)
     local player = Ext.Entity.Get(character)
 
     if not player then
-        Ext.Utils.PrintError("BackgroundGoalFailed: Could not find entity for character " .. tostring(character))
+        if bDebug then Ext.Log.PrintError("BackgroundGoalFailed: Could not find entity for character " .. tostring(character)) end
         return
     end
 
     if not HasPastLifeRegressionTag(player) then
-        _P(player .. " does not have Past Life Regressions tag, ignoring.")
+        if bDebug then Ext.Log.Print(player .. " does not have Past Life Regressions tag, ignoring.") end
         return
     end
 
     if not player.Background or not player.Background.Background then
-        Ext.Utils.PrintError("BackgroundGoalFailed: Could not find background component for character " .. tostring(character))
+        if bDebug then Ext.Log.PrintError("BackgroundGoalFailed: Could not find background component for character " .. tostring(character)) end
         return
     end
 
@@ -110,7 +112,7 @@ local function BackgroundGoalFailed(character, goal)
     ---@type ResourceBackgroundGoal
     local goalResource = Ext.StaticData.Get(goal, Ext.Enums.ExtResourceManagerType.BackgroundGoal)
     if not goalResource then
-        Ext.Utils.PrintError("BackgroundGoalFailed: Could not find background goal for GUID " .. tostring(goal))
+        if bDebug then Ext.Log.PrintError("BackgroundGoalFailed: Could not find background goal for GUID " .. tostring(goal)) end
         return
     end
 
@@ -131,7 +133,7 @@ end
 ---@param character CHARACTER The character the goal was being applied to.
 ---@param goal GUIDSTRING The id of the goal being rewarded.
 local function BackgroundGoalRewarded(character, goal)
-    _P("BackgroundGoalRewarded called for character " .. tostring(character) .. " goal " .. tostring(goal))
+    if bDebug then Ext.Log.Print("BackgroundGoalRewarded called for character " .. tostring(character) .. " goal " .. tostring(goal)) end
     FinishBackgroundGoalApplication("Completed")
 end
 
@@ -140,8 +142,13 @@ local function BackgroundGoalsTick(tickParams)
     ApplyQueuedBackgroundGoals()
 end
 
+local function PastLifeToggleDebug()
+    bDebug = not bDebug
+    Ext.Log.Print("Past Life Regressions debug mode set to " .. tostring(bDebug))
+end
+
 function Init_PastLifeRegressions()
-    _P("Initializing Past Life Regressions Script Extender")
+    if bDebug then Ext.Log.Print("Initializing Past Life Regressions Script Extender") end
 
     -- Processes any pending background goals to apply.
     Ext.Events.Tick:Subscribe(BackgroundGoalsTick)
@@ -149,4 +156,6 @@ function Init_PastLifeRegressions()
     -- Handles identifying when background goals fail and succeed to refine the queue.
     Ext.Osiris.RegisterListener("BackgroundGoalFailed", 2, "before", BackgroundGoalFailed)
     Ext.Osiris.RegisterListener("BackgroundGoalRewarded", 2, "after", BackgroundGoalRewarded)
+
+    Ext.RegisterConsoleCommand("PastLifeToggleDebug", PastLifeToggleDebug)
 end
