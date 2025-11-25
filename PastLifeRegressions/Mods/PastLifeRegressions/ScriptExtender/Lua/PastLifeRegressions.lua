@@ -11,51 +11,77 @@ local QueuedBackgroundGoalStatus = {
 }
 
 ---@class QueuedBackgroundGoal
----@field Character GUIDSTRING The ID of the character.
 ---@field Goal GUIDSTRING The ID of the background goal.
 ---@field GoalBackgroundId GUIDSTRING The ID of the background to switch to.
----@field CurrentBackgroundId GUIDSTRING The ID of the player's current background.
 ---@field Category string The category for the goal
 ---@field Status QueuedBackgroundGoalStatus The status of the queued goal.
 
----@type QueuedBackgroundGoal[]
+---@class PlayerBackgroundGoalQueue
+---@field CurrentBackgroundId GUIDSTRING The ID of the player's current background.
+---@field Goals QueuedBackgroundGoal[] The list of queued background goals for the character.
+
+---Mapping of the character's GUID to their queued background goals.
+---@type table<GUIDSTRING, PlayerBackgroundGoalQueue>
 local queuedBackgroundGoals = {}
 
----Takes the first pending goal in the queued goals to apply if it isn't already in progress.
-local function ApplyQueuedBackgroundGoals()
-    for _, goal in ipairs(queuedBackgroundGoals) do
-        if bDebug then Ext.Log.Print("Pending background goal count: " .. tostring(#queuedBackgroundGoals)) end
+---Applies the queued background goal if it isn't already in progress.
+---@param characterId GUIDSTRING
+---@param goals QueuedBackgroundGoal[]
+local function ApplyQueuedBackgroundGoal(characterId, goals)
+    for _, goal in ipairs(goals) do
         if goal.Status ~= QueuedBackgroundGoalStatus.Added then
             return
         end
-        if bDebug then Ext.Log.Print("Applying queued background goal for character " .. tostring(goal.Character) .. " goal " .. tostring(goal.Goal)) end
-        goal.Status = QueuedBackgroundGoalStatus.Committing
 
-        local player = Ext.Entity.Get(goal.Character)
+        local player = Ext.Entity.Get(characterId)
+        if not player then
+            if bDebug then Ext.Log.PrintError("ApplyQueuedBackgroundGoal: Could not find entity for character " .. tostring(characterId)) end
+            return
+        end
+
+        if bDebug then Ext.Log.Print("Applying queued background goal for character " .. tostring(characterId) .. " goal " .. tostring(goal.Goal)) end
+        goal.Status = QueuedBackgroundGoalStatus.Committing
         player.Background.Background = goal.GoalBackgroundId
-        Osi.AddBackgroundGoal(goal.Character, goal.Goal, goal.Category)
+        Osi.AddBackgroundGoal(characterId, goal.Goal, goal.Category)
         return
     end
 end
 
+---Takes the first pending goal in the queued goals to apply if it isn't already in progress.
+local function ApplyQueuedBackgroundGoals()
+    for characterId, queue in pairs(queuedBackgroundGoals) do
+        if bDebug then Ext.Log.Print("Pending background goal count for " .. tostring(characterId) .. ": " .. tostring(#queue.Goals)) end
+
+        ApplyQueuedBackgroundGoal(characterId, queue.Goals)
+    end
+end
+
 ---Finishes the application of any queued background goals by restoring the player's background id.
+---@param characterId GUIDSTRING The ID of the character.
 ---@param status string Whether the goal was "Completed" or "Failed".
 ---@return boolean True if a queued goal was finished, false otherwise.
-local function FinishBackgroundGoalApplication(status)
+local function FinishBackgroundGoalApplication(characterId, status)
     local removeIndex = -1
-    for index, goal in ipairs(queuedBackgroundGoals) do
+
+    ---@type PlayerBackgroundGoalQueue
+    local playerQueue = queuedBackgroundGoals[characterId]
+    if not playerQueue then
+        return false
+    end
+
+    for index, goal in ipairs(playerQueue.Goals) do
         if goal.Status == QueuedBackgroundGoalStatus.Committing then
-            if bDebug then Ext.Log.Print(status .. " queued background goal for character " .. tostring(goal.Character) .. " goal " .. tostring(goal.Goal)) end
+            if bDebug then Ext.Log.Print(status .. " queued background goal for character " .. tostring(characterId) .. " goal " .. tostring(goal.Goal)) end
 
             removeIndex = index
 
-            local player = Ext.Entity.Get(goal.Character)
-            player.Background.Background = goal.CurrentBackgroundId
+            local player = Ext.Entity.Get(characterId)
+            player.Background.Background = playerQueue.CurrentBackgroundId
         end
     end
 
     if removeIndex > 0 then
-        table.remove(queuedBackgroundGoals, removeIndex)
+        table.remove(playerQueue.Goals, removeIndex)
         return true
     end
     return false
@@ -87,7 +113,7 @@ local function BackgroundGoalFailed(character, goal)
     if bDebug then Ext.Log.Print("BackgroundGoalFailed called for character " .. tostring(character) .. " goal " .. tostring(goal)) end
 
     -- Check queued background goals to make sure we don't double queue
-    if FinishBackgroundGoalApplication("Failed") then
+    if FinishBackgroundGoalApplication(character, "Failed") then
         return
     end
 
@@ -116,17 +142,25 @@ local function BackgroundGoalFailed(character, goal)
         return
     end
 
+    local playerQueue = queuedBackgroundGoals[character]
+    if not playerQueue then
+        playerQueue = {
+            CurrentBackgroundId = player.Background.Background,
+            Goals = {}
+        }
+        queuedBackgroundGoals[character] = playerQueue
+    end
+
     -- Queue applying the background goal
     ---@type QueuedBackgroundGoal
     local queuedGoal = {
-        Character = character,
         Goal = goal,
         GoalBackgroundId = goalResource.BackgroundUuid,
-        CurrentBackgroundId = player.Background.Background,
         Category = "PastLifeRegressions",
         Status = QueuedBackgroundGoalStatus.Added
     }
-    table.insert(queuedBackgroundGoals, queuedGoal)
+    
+    table.insert(playerQueue.Goals, queuedGoal)
 end
 
 --- Example: E6[Server]: BackgroundGoalFailed called for character Elves_Female_Everic_Player_b094fac2-9324-544d-76b2-e2a300399034 goal 92f75626-3bdd-4bb8-b5a5-2750c5e61c0d
@@ -134,7 +168,7 @@ end
 ---@param goal GUIDSTRING The id of the goal being rewarded.
 local function BackgroundGoalRewarded(character, goal)
     if bDebug then Ext.Log.Print("BackgroundGoalRewarded called for character " .. tostring(character) .. " goal " .. tostring(goal)) end
-    FinishBackgroundGoalApplication("Completed")
+    FinishBackgroundGoalApplication(character, "Completed")
 end
 
 --- If there are pending background goals to apply, moves them along.
