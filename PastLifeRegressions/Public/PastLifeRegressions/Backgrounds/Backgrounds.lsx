@@ -15,6 +15,17 @@
                         </node>
                     </children>
                 </node>
+                <node id="Background">
+                    <attribute id="Description" type="TranslatedString" handle="hf7ef5829ge134g44c3g9ad0gfcb2b84ca3d0" version="1"/>
+                    <attribute id="DisplayName" type="TranslatedString" handle="h1d0b94aag5311g4767gbc1egef42c6157e17" version="1"/>
+                    <attribute id="Passives" type="LSString" value="PastLifeRegressions_NoPaladin_Passive"/>
+                    <attribute id="UUID" type="guid" value="445071b2-21f9-4679-b85e-22e7d492fc93"/>
+                    <children>
+                        <node id="Tags">
+                            <attribute id="Object" type="guid" value="238c5177-836f-4167-8ea8-9df39ee5f4ba"/>
+                        </node>
+                    </children>
+                </node>
             </children>
         </node>
     </region>

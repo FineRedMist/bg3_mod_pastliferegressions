@@ -4,10 +4,10 @@ local bDebug = false
 
 --- @enum QueuedBackgroundGoalStatus
 local QueuedBackgroundGoalStatus = {
-	Added = 0,
-	Committing = 1,
-	[0] = "Added",
-	[1] = "Committing",
+    Added = 0,
+    Committing = 1,
+    [0] = "Added",
+    [1] = "Committing",
 }
 
 ---@class QueuedBackgroundGoal
@@ -28,7 +28,10 @@ local function ApplyQueuedBackgroundGoals()
         if goal.Status ~= QueuedBackgroundGoalStatus.Added then
             return
         end
-        if bDebug then Ext.Log.Print("Applying queued background goal for character " .. tostring(goal.Character) .. " goal " .. tostring(goal.Goal)) end
+        if bDebug then
+            Ext.Log.Print("Applying queued background goal for character " ..
+                tostring(goal.Character) .. " goal " .. tostring(goal.Goal))
+        end
         goal.Status = QueuedBackgroundGoalStatus.Committing
 
         local player = Ext.Entity.Get(goal.Character)
@@ -45,7 +48,11 @@ local function FinishBackgroundGoalApplication(status)
     local removeIndex = -1
     for index, goal in ipairs(queuedBackgroundGoals) do
         if goal.Status == QueuedBackgroundGoalStatus.Committing then
-            if bDebug then Ext.Log.Print(status .. " queued background goal for character " .. tostring(goal.Character) .. " goal " .. tostring(goal.Goal)) end
+            if bDebug then
+                Ext.Log.Print(status ..
+                    " queued background goal for character " ..
+                    tostring(goal.Character) .. " goal " .. tostring(goal.Goal))
+            end
 
             removeIndex = index
 
@@ -84,7 +91,10 @@ end
 ---@param character CHARACTER The character the goal was being applied to.
 ---@param goal GUIDSTRING The id of the goal being rewarded.
 local function BackgroundGoalFailed(character, goal)
-    if bDebug then Ext.Log.Print("BackgroundGoalFailed called for character " .. tostring(character) .. " goal " .. tostring(goal)) end
+    if bDebug then
+        Ext.Log.Print("BackgroundGoalFailed called for character " ..
+            tostring(character) .. " goal " .. tostring(goal))
+    end
 
     -- Check queued background goals to make sure we don't double queue
     if FinishBackgroundGoalApplication("Failed") then
@@ -94,7 +104,10 @@ local function BackgroundGoalFailed(character, goal)
     local player = Ext.Entity.Get(character)
 
     if not player then
-        if bDebug then Ext.Log.PrintError("BackgroundGoalFailed: Could not find entity for character " .. tostring(character)) end
+        if bDebug then
+            Ext.Log.PrintError("BackgroundGoalFailed: Could not find entity for character " ..
+                tostring(character))
+        end
         return
     end
 
@@ -104,7 +117,10 @@ local function BackgroundGoalFailed(character, goal)
     end
 
     if not player.Background or not player.Background.Background then
-        if bDebug then Ext.Log.PrintError("BackgroundGoalFailed: Could not find background component for character " .. tostring(character)) end
+        if bDebug then
+            Ext.Log.PrintError("BackgroundGoalFailed: Could not find background component for character " ..
+                tostring(character))
+        end
         return
     end
 
@@ -112,7 +128,10 @@ local function BackgroundGoalFailed(character, goal)
     ---@type ResourceBackgroundGoal
     local goalResource = Ext.StaticData.Get(goal, Ext.Enums.ExtResourceManagerType.BackgroundGoal)
     if not goalResource then
-        if bDebug then Ext.Log.PrintError("BackgroundGoalFailed: Could not find background goal for GUID " .. tostring(goal)) end
+        if bDebug then
+            Ext.Log.PrintError("BackgroundGoalFailed: Could not find background goal for GUID " ..
+                tostring(goal))
+        end
         return
     end
 
@@ -133,7 +152,10 @@ end
 ---@param character CHARACTER The character the goal was being applied to.
 ---@param goal GUIDSTRING The id of the goal being rewarded.
 local function BackgroundGoalRewarded(character, goal)
-    if bDebug then Ext.Log.Print("BackgroundGoalRewarded called for character " .. tostring(character) .. " goal " .. tostring(goal)) end
+    if bDebug then
+        Ext.Log.Print("BackgroundGoalRewarded called for character " ..
+            tostring(character) .. " goal " .. tostring(goal))
+    end
     FinishBackgroundGoalApplication("Completed")
 end
 
@@ -147,6 +169,50 @@ local function PastLifeToggleDebug()
     Ext.Log.Print("Past Life Regressions debug mode set to " .. tostring(bDebug))
 end
 
+---Prints the number of feats that can be granted for the given XP.
+---@param _ string The command
+local function ListBackgrounds(_)
+    ---@type GUIDSTRING[]
+    local backgroundGuids = Ext.StaticData.GetAll(Ext.Enums.ExtResourceManagerType.Background)
+    if not backgroundGuids then
+        Ext.Log.PrintError("ListBackgrounds: Could not retrieve backgrounds!")
+        return
+    end
+
+    for _, backgroundGuid in pairs(backgroundGuids) do
+        ---@type ResourceBackground
+        local background = Ext.StaticData.Get(backgroundGuid, Ext.Enums.ExtResourceManagerType.Background)
+        Ext.Log.Print("Background: " .. tostring(background.DisplayName) .. " (" .. tostring(backgroundGuid) .. ")")
+    end
+end
+
+---Prints the number of feats that can be granted for the given XP.
+---@param _ string The command
+---@param character GUIDSTRING The character set the background for.
+---@param background GUIDSTRING The background to set for the character.
+local function SetBackground(_, character, background)
+    if not character or not background then
+        Ext.Log.PrintError("SetBackground: Missing character id and/or background id arguments.")
+        return
+    end
+    local player = Ext.Entity.Get(character)
+    if not player then
+        Ext.Log.PrintError("SetBackground: Could not find entity for character " .. tostring(character))
+        return
+    end
+
+    ---@type ResourceBackground
+    local background = Ext.StaticData.Get(background, Ext.Enums.ExtResourceManagerType.Background)
+    Ext.Log.Print("Background: " .. tostring(background.DisplayName) .. " (" .. tostring(backgroundGuid) .. ")")
+
+    if not background then
+        Ext.Log.PrintError("SetBackground: Could not find background for GUID " .. tostring(background))
+        return
+    end
+
+    player.Background.Background = background.Guid
+end
+
 function Init_PastLifeRegressions()
     if bDebug then Ext.Log.Print("Initializing Past Life Regressions Script Extender") end
 
@@ -158,4 +224,7 @@ function Init_PastLifeRegressions()
     Ext.Osiris.RegisterListener("BackgroundGoalRewarded", 2, "after", BackgroundGoalRewarded)
 
     Ext.RegisterConsoleCommand("PastLifeToggleDebug", PastLifeToggleDebug)
+
+    Ext.RegisterConsoleCommand("SetBackground", SetBackground)
+    Ext.RegisterConsoleCommand("ListBackgrounds", ListBackgrounds)
 end

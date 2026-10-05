@@ -11,8 +11,14 @@
                     <attribute id="FeatId" type="guid" value="fe70bd84-7406-42c7-8c50-115022a37e82"/>
                     <attribute id="UUID" type="guid" value="53cc31b3-f67b-4792-87cb-73ee1795b246"/>
                 </node>
+                <node id="FeatDescription">
+                    <attribute id="Description" type="TranslatedString" handle="h78dff1bbgc93fg41b6g9858g17a96ca04793" version="1"/>
+                    <attribute id="DisplayName" type="TranslatedString" handle="h1d0b94aag5311g4767gbc1egef42c6157e17" version="1"/>
+                    <attribute id="ExactMatch" type="FixedString" value="PastLifeRegressions_NoPaladin"/>
+                    <attribute id="FeatId" type="guid" value="4fff1307-c513-4f81-960e-6361e4d2bb2a"/>
+                    <attribute id="UUID" type="guid" value="dca8394f-48a8-4187-8d54-9a184a52e288"/>
+                </node>
             </children>
         </node>
     </region>
 </save>
-

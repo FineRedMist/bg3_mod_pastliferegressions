@@ -9,6 +9,11 @@
           <attribute id="PassivesAdded" type="LSString" value="PastLifeRegressions_Passive"/>
           <attribute id="UUID" type="guid" value="fe70bd84-7406-42c7-8c50-115022a37e82"/>
         </node>
+        <node id="Feat">
+          <attribute id="Name" type="FixedString" value="PastLifeRegressions_NoPaladin"/>
+          <attribute id="PassivesAdded" type="LSString" value="PastLifeRegressions_NoPaladin_Passive"/>
+          <attribute id="UUID" type="guid" value="4fff1307-c513-4f81-960e-6361e4d2bb2a"/>
+        </node>
       </children>
     </node>
   </region>
