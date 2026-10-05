@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <save>
-<version major="4" minor="0" revision="9" build="319" lslib_meta="v1,bswap_guids" />
+	<version major="4" minor="0" revision="9" build="319" lslib_meta="v1,bswap_guids" />
 	<region id="config">
 		<node id="config">
 			<children>
@@ -17,7 +17,17 @@
 							</children>
 						</node>
 						<node id="Object">
-							<attribute id="MapKey" type="FixedString" value="Assets/CC/icons_backgrounds/238c5177-836f-4167-8ea8-9df39ee5f4ba.png" />
+							<attribute id="MapKey" type="FixedString" value="Assets/CC/icons_backgrounds/1cee530b-124c-478e-ad6b-f3a32a2f8068.png" />
+							<children>
+								<node id="entries">
+									<attribute id="h" type="int16" value="380" />
+									<attribute id="mipcount" type="int8" value="1" />
+									<attribute id="w" type="int16" value="380" />
+								</node>
+							</children>
+						</node>
+						<node id="Object">
+							<attribute id="MapKey" type="FixedString" value="Assets/CC/icons_backgrounds/445071b2-21f9-4679-b85e-22e7d492fc93.png" />
 							<children>
 								<node id="entries">
 									<attribute id="h" type="int16" value="380" />
