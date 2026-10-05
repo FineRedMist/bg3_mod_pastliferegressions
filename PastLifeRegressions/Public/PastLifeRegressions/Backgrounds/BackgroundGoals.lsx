@@ -13,6 +13,15 @@
                     <attribute id="Title" type="TranslatedString" handle="h78ad2981gafebg446fgb94ega0d18483a94a" version="1"/>
                     <attribute id="UUID" type="guid" value="7e7ed67c-cb18-4fe0-b9ef-64b99d996b40"/>
                 </node>
+                <node id="BackgroundGoal">
+                    <attribute id="BackgroundUUID" type="guid" value="445071b2-21f9-4679-b85e-22e7d492fc93"/>
+                    <attribute id="Description" type="TranslatedString" handle="hf9eac616ga581g478bg92d3g4658774d2c73" version="1"/>
+                    <attribute id="ExperienceReward" type="guid" value="90f636c0-2d85-46d8-9760-30b57c664f4b"/>
+                    <attribute id="InspirationPoints" type="uint32" value="1"/>
+                    <attribute id="RewardLevel" type="uint32" value="3"/>
+                    <attribute id="Title" type="TranslatedString" handle="h78ad2981gafebg446fgb94ega0d18483a94a" version="1"/>
+                    <attribute id="UUID" type="guid" value="9615296c-920f-4c08-ac45-19255f9a67d1"/>
+                </node>
             </children>
         </node>
     </region>
