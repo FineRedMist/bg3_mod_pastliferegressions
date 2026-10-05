@@ -182,7 +182,10 @@ local function ListBackgrounds(_)
     for _, backgroundGuid in pairs(backgroundGuids) do
         ---@type ResourceBackground
         local background = Ext.StaticData.Get(backgroundGuid, Ext.Enums.ExtResourceManagerType.Background)
-        Ext.Log.Print("Background: " .. tostring(background.DisplayName) .. " (" .. tostring(backgroundGuid) .. ")")
+        local displayName = background.DisplayName
+        local displayHandle = displayName.Handle.Handle
+        local displayString = Ext.Loca.GetTranslatedString(displayHandle)
+        Ext.Log.Print("Background: " .. displayString .. " (" .. tostring(backgroundGuid) .. ")")
     end
 end
 
@@ -190,8 +193,8 @@ end
 ---@param _ string The command
 ---@param character GUIDSTRING The character set the background for.
 ---@param background GUIDSTRING The background to set for the character.
-local function SetBackground(_, character, background)
-    if not character or not background then
+local function SetBackground(_, character, backgroundGuid)
+    if not character or not backgroundGuid then
         Ext.Log.PrintError("SetBackground: Missing character id and/or background id arguments.")
         return
     end
@@ -202,15 +205,16 @@ local function SetBackground(_, character, background)
     end
 
     ---@type ResourceBackground
-    local background = Ext.StaticData.Get(background, Ext.Enums.ExtResourceManagerType.Background)
-    Ext.Log.Print("Background: " .. tostring(background.DisplayName) .. " (" .. tostring(backgroundGuid) .. ")")
+    local background = Ext.StaticData.Get(backgroundGuid, Ext.Enums.ExtResourceManagerType.Background)
+    Ext.Log.Print("Background: " ..
+        Ext.Loca.GetTranslatedString(background.DisplayName.Handle.Handle) .. " (" .. tostring(backgroundGuid) .. ")")
 
     if not background then
         Ext.Log.PrintError("SetBackground: Could not find background for GUID " .. tostring(background))
         return
     end
 
-    player.Background.Background = background.Guid
+    player.Background.Background = backgroundGuid
 end
 
 function Init_PastLifeRegressions()
