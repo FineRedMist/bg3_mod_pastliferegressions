@@ -169,7 +169,30 @@ local function PastLifeToggleDebug()
     Ext.Log.Print("Past Life Regressions debug mode set to " .. tostring(bDebug))
 end
 
----Prints the number of feats that can be granted for the given XP.
+---Dumps the background entry and returns if it is valid
+---@param func str name of the calling function
+---@param backgroundGuid GUIDSTRING id of the background to dump
+---@return boolean whether the background was found and dumped successfully
+local function DumpBackgroundEntry(func, backgroundGuid)
+    if not backgroundGuid then
+        Ext.Log.PrintError(func .. ": Missing background id.")
+        return false
+    end
+    ---@type ResourceBackground
+    local background = Ext.StaticData.Get(backgroundGuid, Ext.Enums.ExtResourceManagerType.Background)
+    if not background then
+        Ext.Log.PrintError(func .. ": Could not find background for GUID " .. tostring(backgroundGuid))
+        return false
+    end
+
+    local displayName = background.DisplayName
+    local displayHandle = displayName.Handle.Handle
+    local displayString = Ext.Loca.GetTranslatedString(displayHandle)
+    Ext.Log.Print(func .. ": Background: " .. tostring(backgroundGuid) .. ": " .. displayString)
+    return true
+end
+
+---Lists the backgrounds available in the game
 ---@param _ string The command
 local function ListBackgrounds(_)
     ---@type GUIDSTRING[]
@@ -180,19 +203,14 @@ local function ListBackgrounds(_)
     end
 
     for _, backgroundGuid in pairs(backgroundGuids) do
-        ---@type ResourceBackground
-        local background = Ext.StaticData.Get(backgroundGuid, Ext.Enums.ExtResourceManagerType.Background)
-        local displayName = background.DisplayName
-        local displayHandle = displayName.Handle.Handle
-        local displayString = Ext.Loca.GetTranslatedString(displayHandle)
-        Ext.Log.Print("Background: " .. displayString .. " (" .. tostring(backgroundGuid) .. ")")
+        DumpBackgroundEntry("ListBackgrounds", backgroundGuid)
     end
 end
 
----Prints the number of feats that can be granted for the given XP.
+---Sets the background of the character to the new background guid. May require a save/load to take full effect.
 ---@param _ string The command
 ---@param character GUIDSTRING The character set the background for.
----@param background GUIDSTRING The background to set for the character.
+---@param backgroundGuid GUIDSTRING The background to set for the character.
 local function SetBackground(_, character, backgroundGuid)
     if not character or not backgroundGuid then
         Ext.Log.PrintError("SetBackground: Missing character id and/or background id arguments.")
@@ -204,17 +222,147 @@ local function SetBackground(_, character, backgroundGuid)
         return
     end
 
-    ---@type ResourceBackground
-    local background = Ext.StaticData.Get(backgroundGuid, Ext.Enums.ExtResourceManagerType.Background)
-    Ext.Log.Print("Background: " ..
-        Ext.Loca.GetTranslatedString(background.DisplayName.Handle.Handle) .. " (" .. tostring(backgroundGuid) .. ")")
+    if DumpBackgroundEntry("SetBackground", backgroundGuid) then
+        player.Background.Background = backgroundGuid
+    end
+end
 
-    if not background then
-        Ext.Log.PrintError("SetBackground: Could not find background for GUID " .. tostring(background))
+---Creates a string representing the string version of teh TAGCATEGORY
+---@param categories uint32 The bitfield of categories to convert to a string.
+---@return string A string representing the TAGCATEGORY
+local function GetTagCategories(categories)
+    local result = {}
+    local categoryStrings = {
+        "Undefined",
+        "Code",
+        "Dialog",
+        "Origin",
+        "Identity",
+        "Profession",
+        "Race",
+        "Race_Meta",
+        "Story",
+        "Voice",
+        "Background",
+        "Class",
+        "DialogHidden",
+        "Deity",
+        "Class_Deity",
+        "PlayerRace",
+        "CharacterSheet",
+        "SpellCondition"
+    }
+    if categories == 0 then
+        return categoryStrings[1]
+    end
+    local curbit = 1
+    for i = 0, 17 do
+        if (categories & curbit) ~= 0 then
+            table.insert(result, categoryStrings[i + 2])
+        end
+        curbit = curbit * 2
+    end
+    return table.concat(result, ", ")
+end
+
+local function DumpTagInfo(tagId)
+    tagResource = Ext.StaticData.Get(tagId, Ext.Enums.ExtResourceManagerType.Tag)
+    if tagResource then
+        local displayName = tagResource.DisplayName
+        local displayHandle = displayName.Handle.Handle
+        local displayString = Ext.Loca.GetTranslatedString(displayHandle)
+        Ext.Log.Print("  - " .. tagResource.Name .. " " .. tagId .. " (" .. displayString .. "): " ..
+            GetTagCategories(tagResource.Categories))
+    else
+        Ext.Log.Print("  - " .. tostring(tag) .. " (No resource found)")
+    end
+end
+
+---Dumps a collection of tags.
+---@param func string Name of the function
+---@param tagIds GUIDSTRING[] The list of tag ids to dump.
+local function DumpTagsInfo(func, character, tagIds)
+    Ext.Log.Print(func .. ": Tags for character " .. tostring(character) .. ":")
+    for _, tag in ipairs(tagIds) do
+        DumpTagInfo(tag)
+    end
+end
+
+---Dumps the tag list for the character
+---@param _ string The command
+---@param character GUIDSTRING The character set the background for.
+local function DumpTags(_, character)
+    if not character then
+        Ext.Log.PrintError("DumpTags: Missing character id.")
+        return
+    end
+    local player = Ext.Entity.Get(character)
+    if not player then
+        Ext.Log.PrintError("DumpTags: Could not find entity for character " .. tostring(character))
         return
     end
 
-    player.Background.Background = backgroundGuid
+    if not player.Tag or not player.Tag.Tags then
+        Ext.Log.Print("DumpTags: No tags found for character " .. tostring(character))
+        return
+    end
+
+    DumpTagsInfo("DumpTags", character, player.Tag.Tags)
+end
+
+---Dumps the tag list for the character
+---@param _ string The command
+---@param character GUIDSTRING The character set the background for.
+local function DumpBackgroundInfo(_, character)
+    if not character then
+        Ext.Log.PrintError("DumpBackgroundInfo: Missing character id.")
+        return
+    end
+    local player = Ext.Entity.Get(character)
+    if not player then
+        Ext.Log.PrintError("DumpBackgroundInfo: Could not find entity for character " .. tostring(character))
+        return
+    end
+
+    if player.Background then
+        local backgroundGuid = player.Background.Background
+        if backgroundGuid then
+            DumpBackgroundEntry("DumpBackgroundInfo", backgroundGuid)
+        else
+            Ext.Log.Print("DumpBackgroundInfo: No background set for character " .. tostring(character))
+        end
+    else
+        Ext.Log.Print("DumpBackgroundInfo: No background component found for character " .. tostring(character))
+    end
+
+    if player.BackgroundTag then
+        DumpTagsInfo("DumpBackgroundInfo", character, player.BackgroundTag.Tags)
+    else
+        Ext.Log.Print("DumpBackgroundInfo: No background tag set for character " .. tostring(character))
+    end
+
+    if player.BackgroundPassives then
+        Ext.Log.Print("DumpBackgroundInfo: dumping background passives for " .. tostring(character) .. ":")
+        for _, passive in ipairs(player.BackgroundPassives.field_18) do
+            Ext.Log.Print(" - " .. passive.Name)
+        end
+    else
+        Ext.Log.Print("DumpBackgroundInfo: No background passives component found for character " .. tostring(character))
+    end
+
+    if player.BackgroundGoals then
+        Ext.Log.Print("DumpBackgroundInfo: dumping background goals for " .. tostring(character) .. ":")
+        for id, goals in pairs(player.BackgroundGoals.Goals) do
+            Ext.Log.Print(" - " .. tostring(id) .. ": ")
+            for _, goal in ipairs(goals) do
+                Ext.Log.Print("    - Goal: " ..
+                    tostring(goal.Goal) ..
+                    ", entity: " .. tostring(goal.Entity) .. ", category: " .. tostring(goal.Category))
+            end
+        end
+    else
+        Ext.Log.Print("DumpBackgroundInfo: No background goals component found for character " .. tostring(character))
+    end
 end
 
 function Init_PastLifeRegressions()
@@ -231,4 +379,6 @@ function Init_PastLifeRegressions()
 
     Ext.RegisterConsoleCommand("SetBackground", SetBackground)
     Ext.RegisterConsoleCommand("ListBackgrounds", ListBackgrounds)
+    Ext.RegisterConsoleCommand("DumpTags", DumpTags)
+    Ext.RegisterConsoleCommand("DumpBackgroundInfo", DumpBackgroundInfo)
 end
