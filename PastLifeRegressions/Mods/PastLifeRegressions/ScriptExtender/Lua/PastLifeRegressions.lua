@@ -1,6 +1,7 @@
 local pastLifeRegressionsTagId = "238c5177-836f-4167-8ea8-9df39ee5f4ba"
 
 local bDebug = false
+local bCanTick = false
 
 --- @enum QueuedBackgroundGoalStatus
 local QueuedBackgroundGoalStatus = {
@@ -9,6 +10,160 @@ local QueuedBackgroundGoalStatus = {
     [0] = "Added",
     [1] = "Committing",
 }
+
+---@type table<GUIDSTRING, string> A mapping of background tag GUIDs to their names.
+local backgroundTags = {}
+---@type table<string, boolean> A mapping of background tag names to their public status.
+local publicBackgroundTags = {}
+
+---@type table<integer, GUIDSTRING> Tracks the players that have last been validated in order. They all get validated on loading, then one at a time each tick.
+local validatedPlayers = {}
+
+---Gets the map of tagnames to whether the player has them or not.
+---@param player EntityHandle The player entity to get the tag map for.
+---@return table<string, boolean> A mapping of background tag names to them being used by the current player.
+local function GetPlayerTagMap(player)
+    if not player or not player.Tag or not player.Tag.Tags then
+        return {}
+    end
+
+    local playerTags = {}
+    for _, tag in ipairs(player.Tag.Tags) do
+        local tagName = backgroundTags[tag]
+        if tagName then
+            playerTags[tagName] = true
+        end
+    end
+    if playerTags[pastLifeRegressionsTagId] then
+        -- Merge tags, as they may have taken a feat or something else that grants background tags that are hidden along with the public one.
+        for tagName, _ in pairs(publicBackgroundTags) do
+            if not playerTags[tagName] then
+                playerTags[tagName] = true
+            end
+        end
+    end
+    return playerTags
+end
+
+---Fix up the DB_GLO_Backgrounds_Players table to ensure that the Past Life Regressions background is applied to all players with the Past Life Regressions tag.
+---@param playerId GUIDSTRING The player id, it needs to be of the form <name>_<guid>
+---@param playerTags table<string, boolean> A mapping of background tag names to them being used by the current player.
+local function FixupPlayerBackgroundTable(playerId, playerTags)
+    -- Get the current list of tags.
+    local currentPlayerTags = {}
+    local currentPlayerTagRows = Osi.DB_GLO_Backgrounds_Players:Get(playerId, nil)
+    for _, row in ipairs(currentPlayerTagRows) do
+        local tagName = row[2]
+        currentPlayerTags[tagName] = true
+    end
+
+    for tagName, _ in pairs(playerTags) do
+        if not currentPlayerTags[tagName] then
+            Ext.Log.Print("FixupBackgroundTables: Adding missing background tag " .. tagName ..
+                " for player " .. tostring(playerId))
+            Osi.DB_GLO_Backgrounds_Players(playerId, tagName)
+        end
+    end
+
+    for tagName, _ in pairs(currentPlayerTags) do
+        if not playerTags[tagName] then
+            Ext.Log.Print("FixupBackgroundTables: Removing unused background tag " .. tagName ..
+                " for player " .. tostring(playerId))
+            Osi.DB_GLO_Backgrounds_Players:Delete(playerId, tagName)
+        end
+    end
+end
+
+---Fixes the background tag tables for a specific player.
+---@param playerId GUIDSTRING The player id, it needs to be of the form <name>_<guid>
+local function FixTableForPlayer(playerId)
+    local player = Ext.Entity.Get(playerId)
+    ---@type table<string, boolean> A mapping of background tag names to them being used by the current player.
+    local playerTags = GetPlayerTagMap(player)
+    FixupPlayerBackgroundTable(playerId, playerTags)
+
+    -- Insert the player at the top of the list. They get removed at the end.
+    table.insert(validatedPlayers, 1, playerId)
+end
+
+local function FixupBackgroundTables()
+    -- Go through each player looking for their tags.
+    local players = Osi.DB_Players:Get(nil)
+    for _, row in ipairs(players) do
+        local playerId = row[1]
+        FixTableForPlayer(playerId)
+    end
+end
+
+---@param e EclLuaGameStateChangedEvent
+local function GatherBackgroundInfo(e)
+    if e.FromState == Ext.Enums.ServerGameState.Running then
+        bCanTick = false
+    end
+    if e.ToState == Ext.Enums.ServerGameState.Running then
+        local backgroundGuids = Ext.StaticData.GetAll(Ext.Enums.ExtResourceManagerType.Background)
+        if not backgroundGuids then
+            Ext.Log.PrintError("GatherBackgroundInfo: Could not retrieve backgrounds!")
+            return
+        end
+
+        for _, backgroundGuid in pairs(backgroundGuids) do
+            local background = Ext.StaticData.Get(backgroundGuid, Ext.Enums.ExtResourceManagerType.Background)
+            if background then
+                for _, tag in ipairs(background.Tags) do
+                    local tagName = nil
+                    if not backgroundTags[tag] then
+                        local tagResource = Ext.StaticData.Get(tag, Ext.Enums.ExtResourceManagerType.Tag)
+                        tagName = tagResource.Name .. "_" .. tag
+                        backgroundTags[tag] = tagName
+                        if not background.Hidden then
+                            publicBackgroundTags[tagName] = true
+                        end
+                    end
+                end
+            end
+        end
+
+        FixupBackgroundTables()
+        bCanTick = true
+    end
+end
+
+---Checks one player at a time that is not in the update list.
+---@param tickParams any
+local function OnTickUpdateBackgrounds(tickParams)
+    if not bCanTick then
+        return
+    end
+
+    -- Grab the first player in the DB_Players list that is not in the validatedPlayers list and validate them.
+    local players = Osi.DB_Players:Get(nil)
+    local playerId = nil
+    for _, row in ipairs(players) do
+        playerId = row[1]
+        local bFound = false
+        for _, validatedPlayerId in ipairs(validatedPlayers) do
+            if validatedPlayerId == playerId then
+                bFound = true
+                break
+            end
+        end
+        if not bFound then
+            break
+        end
+        playerId = nil
+    end
+
+    -- If we found a player id, validate them
+    if playerId then
+        FixTableForPlayer(playerId)
+    end
+
+    -- Remove the last element in the validatedPlayers list so we don't keep validating the same players over and over.
+    if #validatedPlayers > 0 then
+        table.remove(validatedPlayers)
+    end
+end
 
 ---@class QueuedBackgroundGoal
 ---@field Character GUIDSTRING The ID of the character.
@@ -23,6 +178,10 @@ local queuedBackgroundGoals = {}
 
 ---Takes the first pending goal in the queued goals to apply if it isn't already in progress.
 local function ApplyQueuedBackgroundGoals()
+    -- We don't want to update backgrounds while we are messing with them for missed goals.
+    if #queuedBackgroundGoals == 0 then
+        OnTickUpdateBackgrounds()
+    end
     for _, goal in ipairs(queuedBackgroundGoals) do
         if bDebug then Ext.Log.Print("Pending background goal count: " .. tostring(#queuedBackgroundGoals)) end
         if goal.Status ~= QueuedBackgroundGoalStatus.Added then
@@ -169,64 +328,6 @@ local function PastLifeToggleDebug()
     Ext.Log.Print("Past Life Regressions debug mode set to " .. tostring(bDebug))
 end
 
----Dumps the background entry and returns if it is valid
----@param func str name of the calling function
----@param backgroundGuid GUIDSTRING id of the background to dump
----@return boolean whether the background was found and dumped successfully
-local function DumpBackgroundEntry(func, backgroundGuid)
-    if not backgroundGuid then
-        Ext.Log.PrintError(func .. ": Missing background id.")
-        return false
-    end
-    ---@type ResourceBackground
-    local background = Ext.StaticData.Get(backgroundGuid, Ext.Enums.ExtResourceManagerType.Background)
-    if not background then
-        Ext.Log.PrintError(func .. ": Could not find background for GUID " .. tostring(backgroundGuid))
-        return false
-    end
-
-    local displayName = background.DisplayName
-    local displayHandle = displayName.Handle.Handle
-    local displayString = Ext.Loca.GetTranslatedString(displayHandle)
-    Ext.Log.Print(func .. ": Background: " .. tostring(backgroundGuid) .. ": " .. displayString)
-    return true
-end
-
----Lists the backgrounds available in the game
----@param _ string The command
-local function ListBackgrounds(_)
-    ---@type GUIDSTRING[]
-    local backgroundGuids = Ext.StaticData.GetAll(Ext.Enums.ExtResourceManagerType.Background)
-    if not backgroundGuids then
-        Ext.Log.PrintError("ListBackgrounds: Could not retrieve backgrounds!")
-        return
-    end
-
-    for _, backgroundGuid in pairs(backgroundGuids) do
-        DumpBackgroundEntry("ListBackgrounds", backgroundGuid)
-    end
-end
-
----Sets the background of the character to the new background guid. May require a save/load to take full effect.
----@param _ string The command
----@param character GUIDSTRING The character set the background for.
----@param backgroundGuid GUIDSTRING The background to set for the character.
-local function SetBackground(_, character, backgroundGuid)
-    if not character or not backgroundGuid then
-        Ext.Log.PrintError("SetBackground: Missing character id and/or background id arguments.")
-        return
-    end
-    local player = Ext.Entity.Get(character)
-    if not player then
-        Ext.Log.PrintError("SetBackground: Could not find entity for character " .. tostring(character))
-        return
-    end
-
-    if DumpBackgroundEntry("SetBackground", backgroundGuid) then
-        player.Background.Background = backgroundGuid
-    end
-end
-
 ---Creates a string representing the string version of teh TAGCATEGORY
 ---@param categories uint32 The bitfield of categories to convert to a string.
 ---@return string A string representing the TAGCATEGORY
@@ -266,7 +367,7 @@ local function GetTagCategories(categories)
 end
 
 local function DumpTagInfo(tagId)
-    tagResource = Ext.StaticData.Get(tagId, Ext.Enums.ExtResourceManagerType.Tag)
+    local tagResource = Ext.StaticData.Get(tagId, Ext.Enums.ExtResourceManagerType.Tag)
     if tagResource then
         local displayName = tagResource.DisplayName
         local displayHandle = displayName.Handle.Handle
@@ -280,9 +381,10 @@ end
 
 ---Dumps a collection of tags.
 ---@param func string Name of the function
+---@param thingWithTags string The thing that has the tags (character, background, etc.)
 ---@param tagIds GUIDSTRING[] The list of tag ids to dump.
-local function DumpTagsInfo(func, character, tagIds)
-    Ext.Log.Print(func .. ": Tags for character " .. tostring(character) .. ":")
+local function DumpTagsInfo(func, thingWithTags, tagIds)
+    Ext.Log.Print(func .. ": Tags for " .. tostring(thingWithTags) .. ":")
     for _, tag in ipairs(tagIds) do
         DumpTagInfo(tag)
     end
@@ -308,6 +410,68 @@ local function DumpTags(_, character)
     end
 
     DumpTagsInfo("DumpTags", character, player.Tag.Tags)
+end
+
+---Dumps the background entry and returns if it is valid
+---@param func str name of the calling function
+---@param backgroundGuid GUIDSTRING id of the background to dump
+---@return boolean whether the background was found and dumped successfully
+local function DumpBackgroundEntry(func, backgroundGuid)
+    if not backgroundGuid then
+        Ext.Log.PrintError(func .. ": Missing background id.")
+        return false
+    end
+    ---@type ResourceBackground
+    local background = Ext.StaticData.Get(backgroundGuid, Ext.Enums.ExtResourceManagerType.Background)
+    if not background then
+        Ext.Log.PrintError(func .. ": Could not find background for GUID " .. tostring(backgroundGuid))
+        return false
+    end
+
+    local displayName = background.DisplayName
+    local displayHandle = displayName.Handle.Handle
+    local displayString = Ext.Loca.GetTranslatedString(displayHandle)
+    local isHidden = background.Hidden and "Hidden " or ""
+    Ext.Log.Print(func .. ": " .. isHidden .. "Background: " .. tostring(backgroundGuid) .. ": " .. displayString)
+    DumpTagsInfo("DumpBackgroundEntry", backgroundGuid, background.Tags)
+    return true
+end
+
+---Lists the backgrounds available in the game
+---@param _ string The command
+local function ListBackgrounds(_)
+    ---@type GUIDSTRING[]
+    local backgroundGuids = Ext.StaticData.GetAll(Ext.Enums.ExtResourceManagerType.Background)
+    if not backgroundGuids then
+        Ext.Log.PrintError("ListBackgrounds: Could not retrieve backgrounds!")
+        return
+    end
+
+    for _, backgroundGuid in pairs(backgroundGuids) do
+        DumpBackgroundEntry("ListBackgrounds", backgroundGuid)
+    end
+end
+
+---Sets the background of the character to the new background guid. May require a save/load to take full effect.
+---@param _ string The command
+---@param character GUIDSTRING The character set the background for.
+---@param backgroundGuid GUIDSTRING The background to set for the character.
+local function SetBackground(_, character, backgroundGuid)
+    if not character or not backgroundGuid then
+        Ext.Log.PrintError("SetBackground: Missing character id and/or background id arguments.")
+        return
+    end
+    local player = Ext.Entity.Get(character)
+    if not player then
+        Ext.Log.PrintError("SetBackground: Could not find entity for character " .. tostring(character))
+        return
+    end
+
+    if DumpBackgroundEntry("SetBackground", backgroundGuid) then
+        player.Background.Background = backgroundGuid
+    end
+
+    FixupBackgroundTables() -- Do a full pass to fixup tables.
 end
 
 ---Dumps the tag list for the character
@@ -363,10 +527,29 @@ local function DumpBackgroundInfo(_, character)
     else
         Ext.Log.Print("DumpBackgroundInfo: No background goals component found for character " .. tostring(character))
     end
+
+    Ext.Log.Print("DumpBackgroundInfo: dumping DB_GLO_Backgrounds_Players")
+    -- Tracks player and background tags
+    local rows = Osi.DB_GLO_Backgrounds_Players:Get(nil, nil)
+    for _, row in ipairs(rows) do
+        local playerId = row[1]
+        local backgroundId = row[2]
+        Ext.Log.Print(" - Player: " .. tostring(playerId) .. ", Background: " .. tostring(backgroundId))
+    end
+
+    Ext.Log.Print("DumpBackgroundInfo: dumping DB_GLO_Backgrounds_Tags")
+    -- Tracks active background tags
+    local rows = Osi.DB_GLO_Backgrounds_Tags:Get(nil)
+    for _, row in ipairs(rows) do
+        local backgroundId = row[1]
+        Ext.Log.Print(" - Background: " .. tostring(backgroundId))
+    end
 end
 
 function Init_PastLifeRegressions()
     if bDebug then Ext.Log.Print("Initializing Past Life Regressions Script Extender") end
+
+    Ext.Events.GameStateChanged:Subscribe(GatherBackgroundInfo)
 
     -- Processes any pending background goals to apply.
     Ext.Events.Tick:Subscribe(BackgroundGoalsTick)
@@ -381,4 +564,5 @@ function Init_PastLifeRegressions()
     Ext.RegisterConsoleCommand("ListBackgrounds", ListBackgrounds)
     Ext.RegisterConsoleCommand("DumpTags", DumpTags)
     Ext.RegisterConsoleCommand("DumpBackgroundInfo", DumpBackgroundInfo)
+    Ext.RegisterConsoleCommand("FixupBackgroundTables", FixupBackgroundTables)
 end
