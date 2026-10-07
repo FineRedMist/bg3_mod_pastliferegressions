@@ -19,6 +19,54 @@ local publicBackgroundTags = {}
 ---@type table<integer, GUIDSTRING> Tracks the players that have last been validated in order. They all get validated on loading, then one at a time each tick.
 local validatedPlayers = {}
 
+-- Retries the gathering of background tags every 10 ticks in case the first gather was while mods were still loading and some backgrounds weren't available yet.
+local retryGatherRate = 10
+local retryGatherCounter = 0
+
+---Gathers the list of background tags (one time only).
+---@return boolean? True if the background tags were gathered, false if they were already gathered, nil on error
+local function GatherBackgroundTags()
+    if #backgroundTags > 0 and retryGatherCounter < retryGatherRate then
+        retryGatherCounter = retryGatherCounter + 1
+        return false
+    end
+    local backgroundGuids = Ext.StaticData.GetAll(Ext.Enums.ExtResourceManagerType.Background)
+    if not backgroundGuids then
+        Ext.Log.PrintError("GatherBackgroundInfo: Could not retrieve backgrounds!")
+        return nil
+    end
+
+    retryGatherCounter = 0
+    local oldBackgroundTags = backgroundTags
+    local oldPublicBackgroundTags = publicBackgroundTags
+    backgroundTags = {}
+    publicBackgroundTags = {}
+
+    for _, backgroundGuid in pairs(backgroundGuids) do
+        local background = Ext.StaticData.Get(backgroundGuid, Ext.Enums.ExtResourceManagerType.Background)
+        if background then
+            for _, tag in ipairs(background.Tags) do
+                local tagName = nil
+                if not backgroundTags[tag] then
+                    local tagResource = Ext.StaticData.Get(tag, Ext.Enums.ExtResourceManagerType.Tag)
+                    tagName = tagResource.Name .. "_" .. tag
+                    backgroundTags[tag] = tagName
+                    if not background.Hidden then
+                        publicBackgroundTags[tagName] = true
+                    end
+                end
+            end
+        end
+    end
+
+    if #backgroundTags ~= #oldBackgroundTags or #publicBackgroundTags ~= #oldPublicBackgroundTags then
+        Ext.Log.Print("GatherBackgroundInfo: Gathered " .. tostring(#backgroundTags) .. " background tags, " ..
+            tostring(#publicBackgroundTags) .. " public background tags.")
+        return true
+    end
+    return false
+end
+
 ---Gets the map of tagnames to whether the player has them or not.
 ---@param player EntityHandle The player entity to get the tag map for.
 ---@return table<string, boolean> A mapping of background tag names to them being used by the current player.
@@ -87,6 +135,8 @@ local function FixTableForPlayer(playerId)
 end
 
 local function FixupBackgroundTables()
+    -- Reset when processing all players.
+    validatedPlayers = {}
     -- Go through each player looking for their tags.
     local players = Osi.DB_Players:Get(nil)
     for _, row in ipairs(players) do
@@ -101,30 +151,6 @@ local function GatherBackgroundInfo(e)
         bCanTick = false
     end
     if e.ToState == Ext.Enums.ServerGameState.Running then
-        local backgroundGuids = Ext.StaticData.GetAll(Ext.Enums.ExtResourceManagerType.Background)
-        if not backgroundGuids then
-            Ext.Log.PrintError("GatherBackgroundInfo: Could not retrieve backgrounds!")
-            return
-        end
-
-        for _, backgroundGuid in pairs(backgroundGuids) do
-            local background = Ext.StaticData.Get(backgroundGuid, Ext.Enums.ExtResourceManagerType.Background)
-            if background then
-                for _, tag in ipairs(background.Tags) do
-                    local tagName = nil
-                    if not backgroundTags[tag] then
-                        local tagResource = Ext.StaticData.Get(tag, Ext.Enums.ExtResourceManagerType.Tag)
-                        tagName = tagResource.Name .. "_" .. tag
-                        backgroundTags[tag] = tagName
-                        if not background.Hidden then
-                            publicBackgroundTags[tagName] = true
-                        end
-                    end
-                end
-            end
-        end
-
-        FixupBackgroundTables()
         bCanTick = true
     end
 end
@@ -133,6 +159,16 @@ end
 ---@param tickParams any
 local function OnTickUpdateBackgrounds(tickParams)
     if not bCanTick then
+        return
+    end
+
+    local firstGather = GatherBackgroundTags()
+    if firstGather == nil then
+        return
+    end
+
+    if firstGather then
+        FixupBackgroundTables()
         return
     end
 
